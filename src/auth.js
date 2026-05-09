@@ -1,25 +1,31 @@
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-import { db } from "@/firebase"; // Firebase setup
+import { ref, computed } from "vue";
+import { api } from "@/api";
+import { getToken, setToken, clearToken, decodeClaims, isValid } from "@/token";
 
-const auth = getAuth();
+const tokenRef = ref(getToken());
 
-export const login = async (email, password) => {
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    console.log(userCredential);
-    return userCredential.user;
-  } catch (error) {
-    console.error("Login failed:", error.message);
-    throw error;
-  }
-};
+export const isAuthenticated = computed(() => isValid(tokenRef.value));
 
-export const logout = async () => {
-  await signOut(auth);
-};
+export const currentUser = computed(() => {
+  const claims = decodeClaims(tokenRef.value);
+  if (!claims) return null;
+  return {
+    id: claims.sub || claims.user_id,
+    email: claims.email,
+    role: claims.role,
+  };
+});
 
-export const authStateListener = (callback) => {
-  return onAuthStateChanged(auth, callback);
-};
+export const isAdmin = computed(() => currentUser.value?.role === "admin");
 
-export {auth, onAuthStateChanged, signOut};
+export async function login(email, password) {
+  const data = await api.post("/auth/login", { email, password }, { auth: false });
+  setToken(data.token);
+  tokenRef.value = data.token;
+  return data.user;
+}
+
+export function logout() {
+  clearToken();
+  tokenRef.value = null;
+}

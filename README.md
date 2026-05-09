@@ -1,14 +1,12 @@
 # Winning Six
 
-A Vue 3 + Vite app backed by Firebase (Firestore).
+A Vue 3 + Vite admin app for the Winning Six 5-a-side stats tracker.
+
+Backed by the Go API in [`../mini-football-golang`](../mini-football-golang). All reads and writes go through that API; no Firestore.
 
 ## Recommended IDE Setup
 
 [VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
 
 ## Project Setup
 
@@ -16,37 +14,25 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 npm install
 ```
 
-### Configure Firebase
-
-This app reads its Firebase config from environment variables. You'll need your own Firebase project to run it locally.
-
-**1. Create a Firebase project**
-
-- Go to the [Firebase console](https://console.firebase.google.com/) and create a new project (or use an existing one).
-- In the project, register a new **Web app** (`</>` icon on the project overview page). Firebase will show you a `firebaseConfig` object — keep that tab open, you'll copy values from it in the next step.
-- Enable **Cloud Firestore** under **Build → Firestore Database**.
-
-**2. Create your `.env` file**
-
-Copy the template:
+### Configure the API base URL
 
 ```sh
 cp .env.example .env
 ```
 
-Open `.env` and fill in the values from the `firebaseConfig` object Firebase gave you:
+The default in `.env.example`:
 
 ```
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-VITE_FIREBASE_MEASUREMENT_ID=...
+VITE_API_BASE_URL=http://localhost:8733
 ```
 
-`.env` is gitignored — it stays on your machine. Never commit it.
+That's the dev port the Go API listens on. Make sure the API is running and reachable; the frontend calls `${VITE_API_BASE_URL}/api/v1/...` for everything.
+
+The backend allows `http://localhost:3000` and `https://winning-six.web.app` in CORS by default — Vite is pinned to port 3000 in `vite.config.js` to match.
+
+### Sign in
+
+The first admin is seeded by the backend on startup from its `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` env vars. Use those credentials at `/login`. Additional admins can be created via `POST /api/v1/auth/register` (must be authenticated).
 
 ### Compile and Hot-Reload for Development
 
@@ -54,14 +40,19 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 npm run dev
 ```
 
+App at [http://localhost:3000](http://localhost:3000).
+
 ### Compile and Minify for Production
 
 ```sh
 npm run build
 ```
 
+Output goes to `dist/`.
+
 ### Lint with [ESLint](https://eslint.org/)
 
 ```sh
 npm run lint
 ```
+
