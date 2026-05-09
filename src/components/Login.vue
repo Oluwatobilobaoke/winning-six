@@ -44,26 +44,29 @@
   
   <script>
   import { ref } from "vue";
+  import { useRoute, useRouter } from "vue-router";
   import { login } from "@/auth";
-  
+
   export default {
     setup() {
+      const route = useRoute();
+      const router = useRouter();
       const email = ref("");
       const password = ref("");
-      const error = ref("");
-      const errorMessage = ref(""); // Store error messages
-  
+      const errorMessage = ref("");
+
       const handleLogin = async () => {
+        errorMessage.value = "";
         try {
           await login(email.value, password.value);
-        //   router.push("/admin");
-          window.location.href = "/dashboard"; // Redirect after login
+          const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "/";
+          router.push(redirect);
         } catch (err) {
-          errorMessage.value = "Login failed: "+ err.message;
+          errorMessage.value = "Login failed: " + (err.message || "unknown error");
         }
       };
-  
-      return { email, password, error, handleLogin, errorMessage };
+
+      return { email, password, handleLogin, errorMessage };
     },
   };
   </script>

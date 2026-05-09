@@ -1,13 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { auth,authStateListener, onAuthStateChanged } from "@/auth";
-import {db, doc, getDoc} from "@/firebase";
+import { isAuthenticated, isAdmin } from '@/auth'
 import Rankings from '../components/Rankings.vue'
 import Games from '../components/Games.vue'
 import Players from '../components/Players.vue'
+import BulkAddPlayers from '../components/BulkAddPlayers.vue'
 import Seasons from '../components/Seasons.vue'
 import Login from '../components/Login.vue'
-import MatchDay from '@/components/MatchDay.vue';
-import Teams from '@/components/Teams.vue';
+import MatchDay from '@/components/MatchDay.vue'
+import Teams from '@/components/Teams.vue'
+import Randomize from '@/components/Randomize.vue'
+import Admins from '@/components/Admins.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -16,89 +18,75 @@ const router = createRouter({
       path: '/',
       name: 'Rankings',
       component: Rankings,
+      meta: { requiresAuth: true },
     },
     {
       path: '/games',
-      name: 'About',
+      name: 'Games',
       component: Games,
-      meta: { requiresAuth: true, requiresAdmin: true }
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/players',
-      name: 'Player',
+      name: 'Players',
       component: Players,
-      meta: { requiresAuth: true, requiresAdmin: true }
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/players/bulk',
+      name: 'BulkAddPlayers',
+      component: BulkAddPlayers,
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/seasons',
-      name: 'Season',
+      name: 'Seasons',
       component: Seasons,
-      meta: { requiresAuth: true, requiresAdmin: true }
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/matchdays',
       name: 'MatchDay',
       component: MatchDay,
-      meta: { requiresAuth: true, requiresAdmin: true }
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/randomize',
+      name: 'Randomize',
+      component: Randomize,
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admins',
+      name: 'Admins',
+      component: Admins,
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/teams',
-      name: 'Team',
+      name: 'Teams',
       component: Teams,
-      meta: { requiresAuth: true, requiresAdmin: true }
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/login',
       name: 'Login',
       component: Login,
-    }
-    // {
-    //   path: '/about',
-    //   name: 'about',
-    //   // route level code-splitting
-    //   // this generates a separate chunk (About.[hash].js) for this route
-    //   // which is lazy-loaded when the route is visited.
-    //   component: () => import('../views/AboutView.vue'),
-    // },
+    },
   ],
 })
 
-async function getCurrentUser() {
-  return new Promise((resolve) => {
-    const unsubscribe = authStateListener((user) => {
-      unsubscribe(); // Stop listening after the first result
-      resolve(user);
-    });
-  });
-}
-
-
-router.beforeEach(async (to, from, next) => {
-  
-
-  if(!to.meta.requiresAuth) {
-    next();
-    return;
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth && !isAuthenticated.value) {
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
-
-  const user = await getCurrentUser();
-
-  if (to.meta.requiresAuth && !user) {
-    next("/login");
-  } else if (to.meta.requiresAdmin && user) {
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    const userData = userDoc.data();
-
-
-    if (userData?.role === "admin") {
-      next();
-    } else {
-      next("/");
-    }
-  } else {
-    next();
+  if (to.meta.requiresAdmin && !isAdmin.value) {
+    return { path: '/' }
   }
-  
-});
+  if (to.name === 'Login' && isAuthenticated.value) {
+    return { path: '/' }
+  }
+  return true
+})
 
 export default router

@@ -33,10 +33,16 @@
             <router-link to="/matchdays" class="nav-link" @click="closeSidebar">MatchDay</router-link>
           </li>
           <li class="mb-2">
+            <router-link to="/randomize" class="nav-link" @click="closeSidebar">Randomize</router-link>
+          </li>
+          <li class="mb-2">
             <router-link to="/players" class="nav-link" @click="closeSidebar">Players</router-link>
           </li>
           <li class="mb-2">
             <router-link to="/seasons" class="nav-link" @click="closeSidebar">Season</router-link>
+          </li>
+          <li class="mb-2">
+            <router-link to="/admins" class="nav-link" @click="closeSidebar">Admins</router-link>
           </li>
 
           <button
@@ -74,28 +80,29 @@
         <router-view />
       </main>
     </div>
+
+    <ToastContainer />
+    <ConfirmDialog />
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
-import { authStateListener, logout } from "@/auth";
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { isAuthenticated, logout } from "@/auth";
+import ToastContainer from "@/components/ToastContainer.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 export default {
   name: "AppLayout",
+  components: { ToastContainer, ConfirmDialog },
   setup() {
-    const user = ref(null);
+    const router = useRouter();
     const sidebarOpen = ref(false);
 
-    onMounted(() => {
-      authStateListener((currentUser) => {
-        user.value = currentUser;
-      });
-    });
-
-    const handleLogout = async () => {
-      await logout();
-      window.location.href = "/";
+    const handleLogout = () => {
+      logout();
+      router.push("/login");
     };
 
     const closeSidebar = () => {
@@ -103,7 +110,7 @@ export default {
     };
 
     return {
-      user,
+      user: isAuthenticated,
       sidebarOpen,
       handleLogout,
       closeSidebar,
