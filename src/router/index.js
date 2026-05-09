@@ -18,7 +18,7 @@ const router = createRouter({
       path: '/',
       name: 'Rankings',
       component: Rankings,
-      meta: { requiresAuth: true },
+      // Public: anonymous visitors land here, just like the old Firestore site.
     },
     {
       path: '/games',

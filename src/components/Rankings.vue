@@ -115,7 +115,7 @@ export default {
 
     const fetchSeasons = async () => {
       try {
-        const data = await api.get("/seasons");
+        const data = await api.get("/seasons", { auth: false });
         seasons.value = data || [];
         if (seasons.value.length) {
           selectedSeason.value = seasons.value[0].id;
@@ -138,8 +138,8 @@ export default {
 
       try {
         const [leaderboard, matchdays] = await Promise.all([
-          api.get(`/seasons/${selectedSeason.value}/leaderboard`),
-          api.get(`/seasons/${selectedSeason.value}/matchdays`),
+          api.get(`/seasons/${selectedSeason.value}/leaderboard`, { auth: false }),
+          api.get(`/seasons/${selectedSeason.value}/matchdays`, { auth: false }),
         ]);
         rankings.value = leaderboard || [];
 
@@ -159,15 +159,15 @@ export default {
 
     const loadMatchdayGames = async (matchdayId) => {
       const [games, teams] = await Promise.all([
-        api.get(`/matchdays/${matchdayId}/games`),
-        api.get(`/matchdays/${matchdayId}/teams`),
+        api.get(`/matchdays/${matchdayId}/games`, { auth: false }),
+        api.get(`/matchdays/${matchdayId}/teams`, { auth: false }),
       ]);
       lastMatchdayGames.value = games || [];
 
       const teamMap = {};
       await Promise.all(
         (teams || []).map(async (t) => {
-          const detail = await api.get(`/teams/${t.id}`);
+          const detail = await api.get(`/teams/${t.id}`, { auth: false });
           teamMap[t.id] = detail;
         })
       );

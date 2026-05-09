@@ -58,23 +58,36 @@
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col">
-      <!-- Mobile top bar -->
-      <header class="md:hidden bg-white shadow p-4 flex items-center">
-        <button @click="sidebarOpen = true" class="mr-4">
-          <!-- Hamburger icon -->
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6 text-gray-700"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-        <h1 class="font-bold text-lg">Football Ranking</h1>
+      <!-- Top bar (always visible; hamburger only when logged in on mobile) -->
+      <header class="bg-white shadow p-4 flex items-center justify-between md:hidden">
+        <div class="flex items-center">
+          <button v-if="user" @click="sidebarOpen = true" class="mr-4" aria-label="Open menu">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <h1 class="font-bold text-lg">Football Ranking</h1>
+        </div>
+        <router-link
+          v-if="!user && $route.name !== 'Login'"
+          to="/login"
+          class="text-sm text-blue-700 font-medium hover:underline"
+        >
+          Sign in
+        </router-link>
       </header>
+
+      <!-- Desktop floating Sign-in for anonymous visitors -->
+      <router-link
+        v-if="!user && $route.name !== 'Login'"
+        to="/login"
+        class="hidden md:inline-flex items-center self-end m-4 px-3 py-1.5 rounded
+               bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+      >
+        Sign in
+      </router-link>
 
       <main class="flex-1 p-6 overflow-y-auto">
         <router-view />
