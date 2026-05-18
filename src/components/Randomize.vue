@@ -55,7 +55,7 @@
     </div>
 
     <!-- Shape -->
-    <div class="grid grid-cols-2 gap-4 mb-4">
+    <div class="grid grid-cols-2 gap-4 mb-2">
       <div>
         <label class="block font-semibold mb-1">Teams</label>
         <input
@@ -63,7 +63,8 @@
           type="number"
           min="2"
           max="10"
-          class="border rounded p-2 w-full"
+          class="border rounded p-2 w-full disabled:bg-gray-100 disabled:text-gray-500"
+          :disabled="!!parsedSizes"
         />
       </div>
       <div>
@@ -73,9 +74,25 @@
           type="number"
           min="1"
           max="20"
-          class="border rounded p-2 w-full"
+          class="border rounded p-2 w-full disabled:bg-gray-100 disabled:text-gray-500"
+          :disabled="!!parsedSizes"
         />
       </div>
+    </div>
+    <div class="mb-4">
+      <label class="block font-semibold mb-1">Custom team sizes (optional)</label>
+      <input
+        v-model="customSizes"
+        type="text"
+        placeholder="e.g. 6,6,6,4"
+        class="border rounded p-2 w-full"
+      />
+      <p v-if="customSizes && !parsedSizes" class="text-xs text-red-600 mt-1">
+        Use comma-separated positive numbers, e.g. 6,6,6,4
+      </p>
+      <p v-else-if="parsedSizes" class="text-xs text-gray-500 mt-1">
+        Overriding teams &amp; per-team — {{ parsedSizes.length }} teams of {{ parsedSizes.join("/") }}
+      </p>
     </div>
 
     <!-- Paste box -->
@@ -88,7 +105,8 @@
         :placeholder="placeholderNames"
       />
       <p class="text-xs text-gray-500 mt-1">
-        {{ pastedCount }} names · target {{ targetCount }} ({{ teamCount }} × {{ perTeam }})
+        {{ pastedCount }} names · target {{ targetCount }}
+        ({{ parsedSizes ? parsedSizes.join("+") : `${teamCount} × ${perTeam}` }})
       </p>
     </div>
 
@@ -271,6 +289,7 @@ export default {
 
     const teamCount = ref(4);
     const perTeam = ref(7);
+    const customSizes = ref("");
     const rawNames = ref("");
 
     // result state
@@ -293,7 +312,21 @@ export default {
     const pastedCount = computed(
       () => rawNames.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean).length
     );
-    const targetCount = computed(() => teamCount.value * perTeam.value);
+    const parsedSizes = computed(() => {
+      const s = customSizes.value.trim();
+      if (!s) return null;
+      const parts = s.split(/[,\s]+/).filter(Boolean).map((x) => Number(x));
+      if (!parts.length || parts.some((n) => !Number.isInteger(n) || n < 1)) return null;
+      return parts;
+    });
+    const effectiveTeamCount = computed(() =>
+      parsedSizes.value ? parsedSizes.value.length : teamCount.value
+    );
+    const targetCount = computed(() =>
+      parsedSizes.value
+        ? parsedSizes.value.reduce((a, b) => a + b, 0)
+        : teamCount.value * perTeam.value
+    );
     const placeholderNames = computed(() => placeholder);
 
     const selectedMatchdayId = computed(() =>
@@ -302,13 +335,11 @@ export default {
         : null
     );
 
-    const canRandomize = computed(
-      () =>
-        !!selectedMatchdayId.value &&
-        rawNames.value.trim().length > 0 &&
-        teamCount.value >= 2 &&
-        perTeam.value >= 1
-    );
+    const canRandomize = computed(() => {
+      if (!selectedMatchdayId.value || !rawNames.value.trim()) return false;
+      if (parsedSizes.value) return parsedSizes.value.length >= 2;
+      return teamCount.value >= 2 && perTeam.value >= 1;
+    });
     const canProceed = computed(
       () => resultReady.value && teams.value.every((t) => t.length > 0)
     );
@@ -421,6 +452,7 @@ export default {
         top4Ids: top4Ids.value,
         teamCount: teamCount.value,
         perTeam: perTeam.value,
+        sizes: parsedSizes.value,
       });
       teams.value = result.teams;
       unassigned.value = [];
@@ -450,7 +482,7 @@ export default {
           // non-fatal — just no dedupe
         }
       }
-      teamCityNames.value = pickFreshCityNames(teamCount.value, taken);
+      teamCityNames.value = pickFreshCityNames(effectiveTeamCount.value, taken);
     };
 
     const moveToUnassigned = (teamIdx, player) => {
@@ -529,7 +561,7 @@ export default {
       seasons, matchdays, players,
       selectedSeason, matchdayChoice, selectedMatchdayId,
       newMatchdayDate, newMatchdayNickname, creatingMatchday,
-      teamCount, perTeam, rawNames,
+      teamCount, perTeam, customSizes, parsedSizes, rawNames,
       teams, unassigned, unmatched, teamCityNames, surplusMessage,
       resultReady, top4Active, top4Ids, top4Names, top4Set,
       pastedCount, targetCount, placeholderNames,
