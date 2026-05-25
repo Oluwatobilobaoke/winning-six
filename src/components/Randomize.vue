@@ -251,7 +251,7 @@ import { useRouter } from "vue-router";
 import { api } from "@/api";
 import { toast } from "@/toast";
 import { resolveNames, runRandomize } from "@/utils/randomizeTeams";
-import { pickFreshCityNames } from "@/utils/cityNames";
+import { pickTeamNames } from "@/utils/cityNames";
 import Datepicker from "@vuepic/vue-datepicker";
 import "@vuepic/vue-datepicker/dist/main.css";
 
@@ -482,7 +482,7 @@ export default {
           // non-fatal — just no dedupe
         }
       }
-      teamCityNames.value = pickFreshCityNames(effectiveTeamCount.value, taken);
+      teamCityNames.value = pickTeamNames(effectiveTeamCount.value, taken);
     };
 
     const moveToUnassigned = (teamIdx, player) => {

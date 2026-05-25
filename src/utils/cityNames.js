@@ -8,26 +8,26 @@ export const CITY_NAMES = [
   "Belgrade", "Zagreb", "Ljubljana", "Sarajevo", "Bratislava", "Antwerp",
 ];
 
-export function pickFreshCityNames(count, taken = []) {
-  const lowerTaken = new Set(taken.map((n) => n.toLowerCase()));
-  const pool = CITY_NAMES.filter((c) => !lowerTaken.has(c.toLowerCase()));
-  const shuffled = pool.slice();
-  for (let i = shuffled.length - 1; i > 0; i--) {
+export const BASE_COLORS = ["Red", "Blue", "White", "Black"];
+export const EXTRA_COLORS = ["Yellow", "Green", "Orange", "Purple", "Pink"];
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  if (shuffled.length >= count) return shuffled.slice(0, count);
-  const extras = [];
-  let n = 2;
-  while (extras.length + shuffled.length < count) {
-    for (const base of CITY_NAMES) {
-      const candidate = `${base} ${n}`;
-      if (!lowerTaken.has(candidate.toLowerCase())) {
-        extras.push(candidate);
-        if (extras.length + shuffled.length >= count) break;
-      }
-    }
-    n++;
+  return a;
+}
+
+export function pickTeamNames(count, taken = []) {
+  if (count <= BASE_COLORS.length) {
+    return BASE_COLORS.slice(0, count);
   }
-  return [...shuffled, ...extras].slice(0, count);
+  const lowerTaken = new Set(taken.map((n) => n.toLowerCase()));
+  const cityPool = CITY_NAMES.filter((c) => !lowerTaken.has(c.toLowerCase()));
+  const cities = shuffle(cityPool).slice(0, count);
+  while (cities.length < count) cities.push(`Team ${cities.length + 1}`);
+  const colorPool = shuffle([...BASE_COLORS, ...EXTRA_COLORS]);
+  return cities.map((city, i) => `${city}(${colorPool[i % colorPool.length]})`);
 }
