@@ -280,6 +280,7 @@ export default {
     const matchdays = ref([]);
     const players = ref([]);
     const top4Ids = ref([]);
+    const last4Ids = ref([]); // last 4 matched pasted names — spread across teams
 
     const selectedSeason = ref(null);
     const matchdayChoice = ref(null); // existing matchday id, or "__new__", or null
@@ -440,6 +441,7 @@ export default {
     const onRandomize = () => {
       const { matched, unmatched: missed } = resolveNames(rawNames.value, players.value);
       lastMatched = matched;
+      last4Ids.value = matched.slice(-4).map((p) => p.id);
       unmatched.value = missed;
       computeTeams();
       pickCityNamesForTeams();
@@ -450,6 +452,7 @@ export default {
       const result = runRandomize({
         matchedPlayers: lastMatched,
         top4Ids: top4Ids.value,
+        last4Ids: last4Ids.value,
         teamCount: teamCount.value,
         perTeam: perTeam.value,
         sizes: parsedSizes.value,
