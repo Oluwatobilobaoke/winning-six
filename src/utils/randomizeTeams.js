@@ -39,22 +39,49 @@ export function resolveNames(rawText, allPlayers) {
   return { matched, unmatched };
 }
 
-export function runRandomize({ matchedPlayers, top4Ids = [], teamCount, perTeam, sizes = null }) {
-  const top4Set = new Set(top4Ids);
-  const top4 = matchedPlayers.filter((p) => top4Set.has(p.id));
-  const rest = matchedPlayers.filter((p) => !top4Set.has(p.id));
-
+export function runRandomize({ matchedPlayers, top4Ids = [], last4Ids = [], teamCount, perTeam, sizes = null }) {
   const caps = sizes && sizes.length
     ? sizes
     : Array.from({ length: teamCount }, () => perTeam);
   const tc = caps.length;
   const teams = Array.from({ length: tc }, () => []);
 
-  const top4Shuffled = shuffle(top4).slice(0, tc);
-  top4Shuffled.forEach((p, i) => teams[i].push(p));
-  let cursor = Math.min(top4.length, tc) % tc;
+  const byId = new Map(matchedPlayers.map((p) => [p.id, p]));
+  const placed = new Set();
+  const place = (p, i) => {
+    teams[i].push(p);
+    placed.add(p.id);
+  };
 
-  for (const p of shuffle(rest)) {
+  // Spread a group of player ids across distinct, emptiest teams that have room.
+  // Players already placed are skipped; if teams run out, the rest fall through
+  // to the general round-robin below.
+  const spread = (ids) => {
+    const avail = teams
+      .map((_, i) => i)
+      .filter((i) => teams[i].length < caps[i])
+      .sort((a, b) => teams[a].length - teams[b].length);
+    for (const id of ids) {
+      if (placed.has(id) || !byId.has(id)) continue;
+      const i = avail.shift();
+      if (i === undefined) break;
+      place(byId.get(id), i);
+    }
+  };
+
+  // 1. Leaderboard #1 is pinned to the last team.
+  const firstId = top4Ids[0];
+  if (tc && firstId !== undefined && byId.has(firstId)) place(byId.get(firstId), tc - 1);
+
+  // 2. Remaining top-4 spread across the other teams.
+  spread(shuffle(top4Ids.slice(1)));
+
+  // 3. Last 4 pasted names spread so they don't share a team.
+  spread(shuffle(last4Ids));
+
+  let cursor = 0;
+
+  for (const p of shuffle(matchedPlayers.filter((p) => !placed.has(p.id)))) {
     let scanned = 0;
     while (teams[cursor].length >= caps[cursor] && scanned < tc) {
       cursor = (cursor + 1) % tc;
