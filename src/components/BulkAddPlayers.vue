@@ -93,10 +93,12 @@
 </template>
 
 <script>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { api, ApiError } from "@/api";
 import { toast } from "@/toast";
+import { confirmAction } from "@/confirm";
+import { similarPlayers } from "@/utils/randomizeTeams";
 
 const VALID_POSITIONS = ["GK", "DEF", "MID", "FWD"];
 
@@ -122,6 +124,15 @@ export default {
     const failures = ref([]);
 
     const parsed = computed(() => parseLines(raw.value));
+    const existingPlayers = ref([]);
+
+    onMounted(async () => {
+      try {
+        existingPlayers.value = (await api.get("/players")) || [];
+      } catch (err) {
+        toast.error(err.message || "Failed to load players");
+      }
+    });
 
     const submit = async () => {
       duplicates.value = [];
@@ -139,6 +150,25 @@ export default {
           `Invalid position "${localBad.position}". Use GK, DEF, MID, or FWD.`
         );
         return;
+      }
+
+      const lookalikes = [];
+      players.forEach((p, i) => {
+        const pool = [...existingPlayers.value, ...players.slice(0, i)];
+        const similar = similarPlayers(p.name, pool);
+        if (similar.length) {
+          lookalikes.push(`"${p.name}" → ${similar.map((s) => `"${s.name}"`).join(" or ")}`);
+        }
+      });
+      if (lookalikes.length) {
+        const ok = await confirmAction({
+          title: "Some names look like players you already have",
+          message:
+            lookalikes.join("\n") +
+            "\n\nOnly continue if these are all different people. Otherwise cancel and fix the names.",
+          confirmLabel: "Create anyway",
+        });
+        if (!ok) return;
       }
 
       saving.value = true;

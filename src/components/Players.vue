@@ -50,13 +50,30 @@
           :key="player.id"
           class="px-3 py-2 flex justify-between items-center gap-2"
         >
-          <span class="truncate">{{ player.name }}</span>
-          <button
-            @click="deletePlayer(player)"
-            class="text-red-600 hover:underline text-sm shrink-0"
-          >
-            Delete
-          </button>
+          <span class="truncate">
+            {{ player.name }}
+            <span
+              v-if="player.is_member === false"
+              class="ml-1 text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600"
+            >
+              Guest
+            </span>
+          </span>
+          <span class="flex gap-3 shrink-0">
+            <button
+              @click="toggleMember(player)"
+              class="text-blue-600 hover:underline text-sm disabled:opacity-50"
+              :disabled="togglingId === player.id"
+            >
+              {{ player.is_member === false ? "Make member" : "Mark as guest" }}
+            </button>
+            <button
+              @click="deletePlayer(player)"
+              class="text-red-600 hover:underline text-sm"
+            >
+              Delete
+            </button>
+          </span>
         </li>
         <li v-if="!players.length" class="px-3 py-4 text-gray-500 italic">
           No players yet.
@@ -71,7 +88,7 @@ import { ref, onMounted } from "vue";
 import { api } from "@/api";
 import { toast } from "@/toast";
 import { confirmAction } from "@/confirm";
-import { nameKey } from "@/utils/randomizeTeams";
+import { nameKey, similarPlayers } from "@/utils/randomizeTeams";
 
 export default {
   setup() {
@@ -100,6 +117,16 @@ export default {
       if (existing) {
         toast.error(`Player already exists: "${existing.name}"`);
         return;
+      }
+
+      const similar = similarPlayers(name, players.value);
+      if (similar.length) {
+        const ok = await confirmAction({
+          title: `Did you mean ${similar.map((p) => `"${p.name}"`).join(" or ")}?`,
+          message: `"${name}" looks like an existing player. Only continue if this is a different person.`,
+          confirmLabel: "Create new player",
+        });
+        if (!ok) return;
       }
 
       saving.value = true;
@@ -135,9 +162,34 @@ export default {
       }
     };
 
+    const togglingId = ref(null);
+
+    const toggleMember = async (player) => {
+      const makeMember = player.is_member === false;
+      togglingId.value = player.id;
+      try {
+        const updated = await api.patch(`/players/${player.id}`, {
+          name: player.name,
+          position: player.position || "",
+          is_member: makeMember,
+        });
+        players.value = players.value.map((p) => (p.id === player.id ? updated : p));
+        toast.success(
+          makeMember ? `"${player.name}" is now a member` : `"${player.name}" marked as guest`
+        );
+      } catch (err) {
+        toast.error(err.message || "Failed to update player");
+      } finally {
+        togglingId.value = null;
+      }
+    };
+
     onMounted(fetchPlayers);
 
-    return { playerName, players, savePlayer, deletePlayer, loading, saving };
+    return {
+      playerName, players, savePlayer, deletePlayer, loading, saving,
+      toggleMember, togglingId,
+    };
   },
 };
 </script>

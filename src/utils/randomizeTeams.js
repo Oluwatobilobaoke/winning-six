@@ -14,7 +14,49 @@ export function nameKey(s) {
   return s.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-export function resolveNames(rawText, allPlayers) {
+function squashKey(s) {
+  return nameKey(s).replace(/ /g, "");
+}
+
+function editDistance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[a.length][b.length];
+}
+
+function allowedTypos(len) {
+  if (len <= 4) return 0;
+  if (len <= 7) return 1;
+  return 2;
+}
+
+// Players whose names look like `name` but aren't an exact (lenient) match:
+// spacing differences ("Tay Code" vs "TayCode") or small typos ("Jay Najia" vs "JayNaija").
+export function similarPlayers(name, allPlayers) {
+  const key = nameKey(name);
+  const squashed = squashKey(name);
+  if (!squashed) return [];
+  const hits = [];
+  for (const p of allPlayers) {
+    if (nameKey(p.name) === key) continue;
+    const other = squashKey(p.name);
+    const limit = allowedTypos(Math.min(squashed.length, other.length));
+    if (other === squashed || editDistance(squashed, other) <= limit) hits.push(p);
+  }
+  return hits;
+}
+
+// `resolutions` maps nameKey(line) to a player (picked by hand) or null (skipped).
+export function resolveNames(rawText, allPlayers, resolutions = {}) {
   const lines = rawText
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -28,13 +70,20 @@ export function resolveNames(rawText, allPlayers) {
   const matched = [];
   const unmatched = [];
   const seen = new Set();
+  const seenIds = new Set();
   for (const line of lines) {
     const key = nameKey(line);
     if (seen.has(key)) continue;
     seen.add(key);
-    const hit = byKey.get(key);
-    if (hit) matched.push(hit);
-    else unmatched.push(line);
+    const hit = byKey.get(key) ?? resolutions[key];
+    if (hit === null) continue;
+    if (!hit) {
+      unmatched.push(line);
+      continue;
+    }
+    if (seenIds.has(hit.id)) continue;
+    seenIds.add(hit.id);
+    matched.push(hit);
   }
   return { matched, unmatched };
 }

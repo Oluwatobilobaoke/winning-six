@@ -110,13 +110,89 @@
       </p>
     </div>
 
-    <button
-      @click="onRandomize"
-      class="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
-      :disabled="!canRandomize"
+    <!-- Unmatched -->
+    <div
+      v-if="namesChecked && unmatched.length"
+      class="mb-4 p-3 border border-amber-300 rounded bg-amber-50"
     >
-      {{ resultReady ? "↻ Re-shuffle" : "Randomize" }}
-    </button>
+      <p class="font-semibold text-amber-800 mb-1">
+        ⚠ {{ unmatched.length }} name{{ unmatched.length === 1 ? "" : "s" }} not found — settle
+        {{ unmatched.length === 1 ? "it" : "each one" }} before randomizing:
+      </p>
+      <p class="text-xs text-amber-700 mb-2">
+        Pick the existing player, add them as a guest, create them, or skip them.
+      </p>
+      <ul class="space-y-1">
+        <li
+          v-for="name in unmatched"
+          :key="name"
+          class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 text-sm"
+        >
+          <span class="flex flex-col">
+            <span class="font-mono break-all">"{{ name }}"</span>
+            <span v-if="suggestionsFor(name).length" class="text-amber-800">
+              Did you mean
+              <template v-for="(s, i) in suggestionsFor(name)" :key="s.id">
+                <span v-if="i > 0">or</span>
+                <button
+                  @click="useSuggestion(name, s)"
+                  class="font-semibold text-blue-700 hover:underline"
+                >
+                  {{ s.name }}</button
+                >
+              </template>?
+            </span>
+          </span>
+          <span class="flex flex-wrap items-center gap-x-3 gap-y-1 shrink-0">
+            <label class="inline-flex items-center gap-1 text-gray-700">
+              <input v-model="guestFlags[name]" type="checkbox" />
+              Guest
+            </label>
+            <button
+              @click="createUnmatched(name)"
+              class="text-blue-600 hover:underline disabled:opacity-50 text-left"
+              :disabled="creatingPlayer === name"
+            >
+              {{
+                creatingPlayer === name
+                  ? "Creating..."
+                  : guestFlags[name]
+                  ? "+ Add as guest"
+                  : "+ Create as new player"
+              }}
+            </button>
+            <button @click="skipUnmatched(name)" class="text-gray-600 hover:underline text-left">
+              Skip
+            </button>
+          </span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button
+        v-if="!namesChecked"
+        @click="checkNames"
+        class="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        :disabled="!canCheck"
+      >
+        Check names
+      </button>
+      <button
+        v-else
+        @click="onRandomize"
+        class="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        :disabled="!canRandomize"
+      >
+        {{ resultReady ? "↻ Re-shuffle" : "Randomize" }}
+      </button>
+      <span v-if="namesChecked && unmatched.length" class="text-sm text-amber-700">
+        Settle {{ unmatched.length }} name{{ unmatched.length === 1 ? "" : "s" }} above first
+      </span>
+      <span v-else-if="namesChecked && !resultReady" class="text-sm text-green-700">
+        ✔ All {{ drawCount }} names settled
+      </span>
+    </div>
 
     <!-- Result -->
     <div v-if="resultReady" class="mt-6">
@@ -138,34 +214,6 @@
         </span>
       </p>
 
-      <!-- Unmatched -->
-      <div v-if="unmatched.length" class="mb-4 p-3 border border-amber-300 rounded bg-amber-50">
-        <p class="font-semibold text-amber-800 mb-2">
-          ⚠ {{ unmatched.length }} unmatched name{{ unmatched.length === 1 ? "" : "s" }}:
-        </p>
-        <ul class="space-y-1">
-          <li
-            v-for="name in unmatched"
-            :key="name"
-            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 text-sm"
-          >
-            <span class="font-mono break-all">"{{ name }}"</span>
-            <span class="flex flex-wrap gap-x-3 gap-y-1 shrink-0">
-              <button
-                @click="createUnmatched(name)"
-                class="text-blue-600 hover:underline disabled:opacity-50 text-left"
-                :disabled="creatingPlayer === name"
-              >
-                {{ creatingPlayer === name ? "Creating..." : "+ Create as new player" }}
-              </button>
-              <button @click="skipUnmatched(name)" class="text-gray-600 hover:underline text-left">
-                Skip
-              </button>
-            </span>
-          </li>
-        </ul>
-      </div>
-
       <!-- Team cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div
@@ -186,6 +234,7 @@
               <span :class="{ 'font-semibold text-green-700': top4Set.has(p.id) }">
                 {{ p.name }}
                 <span v-if="top4Set.has(p.id)" class="text-xs text-green-600">★</span>
+                <span v-if="p.is_member === false" class="text-xs text-gray-500">(guest)</span>
               </span>
               <button
                 @click="moveToUnassigned(idx, p)"
@@ -246,11 +295,12 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "@/api";
 import { toast } from "@/toast";
-import { resolveNames, runRandomize } from "@/utils/randomizeTeams";
+import { nameKey, resolveNames, runRandomize, similarPlayers } from "@/utils/randomizeTeams";
+import { confirmAction } from "@/confirm";
 import { pickTeamNames } from "@/utils/cityNames";
 import Datepicker from "@vuepic/vue-datepicker";
 import "@vuepic/vue-datepicker/dist/main.css";
@@ -297,6 +347,10 @@ export default {
     const teams = ref([]);
     const unassigned = ref([]);
     const unmatched = ref([]);
+    const guestFlags = ref({});
+    const resolutions = ref({});
+    const namesChecked = ref(false);
+    const drawCount = ref(0);
     const teamCityNames = ref([]);
     const surplusMessage = ref("");
     const resultReady = ref(false);
@@ -336,11 +390,14 @@ export default {
         : null
     );
 
-    const canRandomize = computed(() => {
+    const canCheck = computed(() => {
       if (!selectedMatchdayId.value || !rawNames.value.trim()) return false;
       if (parsedSizes.value) return parsedSizes.value.length >= 2;
       return teamCount.value >= 2 && perTeam.value >= 1;
     });
+    const canRandomize = computed(
+      () => canCheck.value && namesChecked.value && unmatched.value.length === 0
+    );
     const canProceed = computed(
       () => resultReady.value && teams.value.every((t) => t.length > 0)
     );
@@ -438,11 +495,28 @@ export default {
 
     let lastMatched = []; // remembered between reshuffles
 
+    watch(rawNames, () => {
+      namesChecked.value = false;
+      resultReady.value = false;
+    });
+
+    const checkNames = () => {
+      const { matched, unmatched: missed } = resolveNames(
+        rawNames.value,
+        players.value,
+        resolutions.value
+      );
+      unmatched.value = missed;
+      drawCount.value = matched.length;
+      namesChecked.value = true;
+      return matched;
+    };
+
     const onRandomize = () => {
-      const { matched, unmatched: missed } = resolveNames(rawNames.value, players.value);
+      const matched = checkNames();
+      if (unmatched.value.length) return;
       lastMatched = matched;
       last4Ids.value = matched.slice(-4).map((p) => p.id);
-      unmatched.value = missed;
       computeTeams();
       pickCityNamesForTeams();
       resultReady.value = true;
@@ -502,19 +576,35 @@ export default {
       unassigned.value = unassigned.value.filter((p) => p.id !== player.id);
     };
 
+    const suggestionsFor = (name) => similarPlayers(name, players.value);
+
+    const useSuggestion = (name, player) => {
+      resolutions.value[nameKey(name)] = player;
+      delete guestFlags.value[name];
+      checkNames();
+      toast.success(`Using "${player.name}" for "${name}"`);
+    };
+
     const createUnmatched = async (name) => {
+      const similar = suggestionsFor(name);
+      if (similar.length) {
+        const ok = await confirmAction({
+          title: `Did you mean ${similar.map((p) => `"${p.name}"`).join(" or ")}?`,
+          message: `"${name}" looks like an existing player. Only continue if this is a different person.`,
+          confirmLabel: guestFlags.value[name] ? "Add as new guest" : "Create new player",
+        });
+        if (!ok) return;
+      }
       creatingPlayer.value = name;
       try {
-        const created = await api.post("/players", { name });
+        const isGuest = !!guestFlags.value[name];
+        const created = await api.post("/players", { name, is_member: !isGuest });
         players.value.push(created);
-        unmatched.value = unmatched.value.filter((n) => n !== name);
-        // Inject into the smallest team so they're not lost.
-        let minIdx = 0;
-        for (let i = 1; i < teams.value.length; i++) {
-          if (teams.value[i].length < teams.value[minIdx].length) minIdx = i;
-        }
-        teams.value[minIdx].push(created);
-        toast.success(`Player "${created.name}" created`);
+        delete guestFlags.value[name];
+        checkNames();
+        toast.success(
+          isGuest ? `Guest "${created.name}" added` : `Player "${created.name}" created`
+        );
       } catch (err) {
         toast.error(err.message || "Failed to create player");
       } finally {
@@ -523,7 +613,8 @@ export default {
     };
 
     const skipUnmatched = (name) => {
-      unmatched.value = unmatched.value.filter((n) => n !== name);
+      resolutions.value[nameKey(name)] = null;
+      checkNames();
     };
 
     const proceed = async () => {
@@ -565,16 +656,17 @@ export default {
       selectedSeason, matchdayChoice, selectedMatchdayId,
       newMatchdayDate, newMatchdayNickname, creatingMatchday,
       teamCount, perTeam, customSizes, parsedSizes, rawNames,
-      teams, unassigned, unmatched, teamCityNames, surplusMessage,
+      teams, unassigned, unmatched, guestFlags, teamCityNames, surplusMessage,
       resultReady, top4Active, top4Ids, top4Names, top4Set,
       pastedCount, targetCount, placeholderNames,
-      canRandomize, canProceed,
+      canCheck, canRandomize, canProceed, namesChecked, drawCount, checkNames,
       matchdayLabel,
       onSeasonChange, onMatchdayChange,
       createMatchdayInline, cancelNewMatchday,
       onRandomize, reshuffle,
       moveToUnassigned, moveToSmallestTeam,
       createUnmatched, skipUnmatched, creatingPlayer,
+      suggestionsFor, useSuggestion,
       proceed, proceeding,
     };
   },
