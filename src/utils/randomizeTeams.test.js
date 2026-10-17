@@ -1,7 +1,7 @@
 // Run with: node --test src/utils/randomizeTeams.test.js
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runRandomize } from "./randomizeTeams.js";
+import { resolveNames, runRandomize, similarPlayers } from "./randomizeTeams.js";
 
 const players = Array.from({ length: 24 }, (_, i) => ({
   id: `p${i + 1}`,
@@ -45,4 +45,42 @@ test("4-team case: #1 always in last team, last-4 never share a team", () => {
     assert.equal(flat.length, players.length, "all players placed");
     assert.equal(new Set(flat).size, players.length, "no duplicate placements");
   }
+});
+
+test("similarPlayers: flags spacing and small typos, ignores exact and unrelated names", () => {
+  const roster = [
+    { id: "a", name: "TayCode" },
+    { id: "b", name: "JayNaija" },
+    { id: "c", name: "Tobi" },
+    { id: "d", name: "Ifeanyi" },
+  ];
+  const names = (n) => similarPlayers(n, roster).map((p) => p.name);
+
+  assert.deepEqual(names("Tay Code"), ["TayCode"]);
+  assert.deepEqual(names("Jay Najia"), ["JayNaija"]);
+  assert.deepEqual(names("jay naija"), ["JayNaija"]);
+  assert.deepEqual(names("taycode"), [], "exact lenient match is not a 'did you mean'");
+  assert.deepEqual(names("Toby"), [], "short names need an exact match to avoid false alarms");
+  assert.deepEqual(names("Bolade"), []);
+});
+
+test("resolveNames: hand-picked and skipped names keep pasted order and never double up", () => {
+  const roster = [
+    { id: "a", name: "TayCode" },
+    { id: "b", name: "JayNaija" },
+    { id: "c", name: "Tobi" },
+  ];
+  const raw = "Tobi\nJay Najia\nNewbie\nTayCode\nTay Code";
+
+  const before = resolveNames(raw, roster);
+  assert.deepEqual(before.matched.map((p) => p.id), ["c", "a"]);
+  assert.deepEqual(before.unmatched, ["Jay Najia", "Newbie", "Tay Code"]);
+
+  const after = resolveNames(raw, roster, {
+    "jay najia": roster[1],
+    newbie: null,
+    "tay code": roster[0],
+  });
+  assert.deepEqual(after.matched.map((p) => p.id), ["c", "b", "a"]);
+  assert.deepEqual(after.unmatched, []);
 });
